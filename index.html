@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>工厂排产甘特图</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#eef1f4;--panel:#fff;--ink:#1b2733;--mute:#5d6c80;--line:#d9e0e8;--wk:#f1f4f7;--today:#d6336c;
+--run:#1f7a8c;--done:#4f8a5b;--late:#b3261e;--wait:#7d8a9b;--warn:#b7791f;--acc:#1f4e79}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12181f;--panel:#1a222b;--ink:#e6ebf1;--mute:#93a1b3;--line:#2c3743;--wk:#1f2933;--today:#ff6b9a;--run:#3ba3b8;--done:#6bb078;--late:#ff6b5e;--wait:#8b98a9;--warn:#e0a53c;--acc:#7fb2e5}}
+:root[data-theme="dark"]{--bg:#12181f;--panel:#1a222b;--ink:#e6ebf1;--mute:#93a1b3;--line:#2c3743;--wk:#1f2933;--today:#ff6b9a;--run:#3ba3b8;--done:#6bb078;--late:#ff6b5e;--wait:#8b98a9;--warn:#e0a53c;--acc:#7fb2e5}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:20px 14px 40px}
+h1{font-size:22px;margin:0 0 4px;font-weight:700;letter-spacing:.02em}
+h2{font-size:16px;margin:28px 0 10px}
+.sub{color:var(--mute);margin:0 0 14px}
+.bar-top{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.leg{display:flex;gap:12px;flex-wrap:wrap;color:var(--mute);font-size:12px;margin-left:auto}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+button,input,select{font:inherit;color:inherit}
+.btn{border:1px solid var(--line);background:var(--panel);padding:6px 12px;border-radius:6px;cursor:pointer}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+:root:not([data-theme="light"]) .btn.pri{color:#0d1620}
+.btn:focus-visible,.bar:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.scroll{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+.chart{position:relative}
+.hd{display:flex;height:50px;border-bottom:1px solid var(--line)}
+.hd .lab{height:50px}
+.mrow,.drow{display:flex}
+.m{height:24px;line-height:24px;padding-left:6px;font-weight:600;font-size:12px;border-left:1px solid var(--line);overflow:hidden;white-space:nowrap}
+.d{height:26px;line-height:26px;text-align:center;font-size:11px;color:var(--mute)}
+.d.we{background:var(--wk)}
+.d.td{color:#fff;background:var(--today);font-weight:700}
+.row{display:flex;border-bottom:1px solid var(--line);position:relative;z-index:1}
+.row:last-child{border-bottom:0}
+.lab{position:sticky;left:0;z-index:3;width:150px;flex:none;background:var(--panel);border-right:1px solid var(--line);padding:8px 10px;display:flex;flex-direction:column;justify-content:center}
+.lab span{color:var(--mute);font-size:12px}
+.trk{position:relative;flex:none}
+.grid{position:absolute;left:150px;top:50px;bottom:0;z-index:0;pointer-events:none}
+.wk{position:absolute;top:0;bottom:0;background:var(--wk)}
+.tl{position:absolute;top:0;bottom:0;width:2px;background:var(--today);opacity:.7}
+.bar{position:absolute;height:26px;border:1.5px solid var(--c);border-radius:4px;background:color-mix(in srgb,var(--c) 16%,var(--panel));padding:0 6px;text-align:left;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px}
+.bar .f{position:absolute;left:0;bottom:0;height:5px;background:var(--c)}
+.bar.run{--c:var(--run)}.bar.done{--c:var(--done)}.bar.late{--c:var(--late)}.bar.wait{--c:var(--wait)}.bar.warn{--c:var(--warn)}
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:13px}
+th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--mute);font-weight:600;background:var(--wk)}
+tr:last-child td{border-bottom:0;font-weight:700}
+.tw{overflow-x:auto}
+.pb{display:inline-block;width:70px;height:6px;background:var(--wk);border-radius:3px;vertical-align:middle;margin-left:6px;overflow:hidden;border:1px solid var(--line)}
+.pb i{display:block;height:100%;background:var(--run)}
+.bad{color:var(--late);font-weight:600}.wn{color:var(--warn);font-weight:600}
+dialog{border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);padding:18px;width:min(380px,92vw)}
+dialog::backdrop{background:rgba(0,0,0,.4)}
+dialog h3{margin:0 0 12px;font-size:16px}
+label{display:block;margin-bottom:10px;font-size:12px;color:var(--mute)}
+label input,label select{display:block;width:100%;margin-top:3px;padding:7px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);font-size:14px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.act{display:flex;gap:8px;margin-top:6px}.act .sp{flex:1}
+.err{color:var(--late);font-size:12px;min-height:18px}
+.empty{padding:30px;text-align:center;color:var(--mute)}
+</style>
+</head>
+<body>
+<main>
+<h1>工厂排产甘特图</h1>
+<p class="sub" id="sum"></p>
+<div class="bar-top">
+<button class="btn pri" id="add">新增排产</button>
+<button class="btn" id="reset">恢复示例数据</button>
+<div class="leg"><span><i style="background:var(--run)"></i>进行中</span><span><i style="background:var(--warn)"></i>进度落后</span><span><i style="background:var(--late)"></i>延期</span><span><i style="background:var(--done)"></i>已完成</span><span><i style="background:var(--wait)"></i>未开始</span></div>
+</div>
+<div class="scroll"><div class="chart" id="chart"></div></div>
+<h2>各工厂生产情况</h2>
+<div class="tw"><table id="stats"></table></div>
+</main>
+
+<dialog id="dlg">
+<form id="frm">
+<h3 id="dt">编辑排产</h3>
+<label>工厂（可直接输入新工厂名）<input id="f_fac" list="facs" required><datalist id="facs"></datalist></label>
+<label>订单 / 产品<input id="f_name" required></label>
+<div class="two">
+<label>开始日期<input id="f_s" type="date" required></label>
+<label>结束日期<input id="f_e" type="date" required></label>
+</div>
+<div class="two">
+<label>计划数量<input id="f_t" type="number" min="1" required></label>
+<label>已完成数量<input id="f_d" type="number" min="0" required></label>
+</div>
+<div class="err" id="err"></div>
+<div class="act"><button type="button" class="btn" id="del">删除</button><span class="sp"></span><button type="button" class="btn" id="cancel">取消</button><button class="btn pri" type="submit">保存</button></div>
+</form>
+</dialog>
+
+<script>
+const DAY=864e5,DW=26,KEY='factory-gantt-v1';
+const toN=s=>Math.floor(Date.parse(s+'T00:00:00Z')/DAY);
+const fromN=n=>new Date(n*DAY).toISOString().slice(0,10);
+const nw=new Date(),p2=x=>String(x).padStart(2,'0');
+const T=toN(nw.getFullYear()+'-'+p2(nw.getMonth()+1)+'-'+p2(nw.getDate()));
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const sample=()=>[
+['苏州一厂','电机外壳 A12',-12,6,5000,3300],['苏州一厂','控制面板 C7',4,16,2400,0],['苏州一厂','端盖 E3',-4,3,1800,900],
+['东莞二厂','手机支架 M5',-16,-2,8000,7200],['东莞二厂','充电底座 P9',-5,10,6000,2400],
+['成都三厂','传动轴 S21',-8,5,3000,2600],['成都三厂','齿轮箱 G4',7,20,1500,0]
+].map((r,i)=>({id:'o'+i,factory:r[0],name:r[1],start:fromN(T+r[2]),end:fromN(T+r[3]),total:r[4],done:r[5]}));
+let orders;
+try{orders=JSON.parse(localStorage.getItem(KEY));}catch(e){}
+if(!Array.isArray(orders)||!orders.length)orders=sample();
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(orders))}catch(e){}};
+
+function calc(o){
+ const s=toN(o.start),e=toN(o.end),len=e-s+1;
+ const act=o.total?Math.min(1,o.done/o.total):0;
+ const plan=Math.max(0,Math.min(1,(T-s+1)/len));
+ let st=act>=1?'done':T>e?'late':T<s?'wait':'run';
+ return{s,e,len,act,plan,st,behind:st==='run'&&plan-act>0.1};
+}
+const NAME={done:'已完成',late:'延期',wait:'未开始',run:'进行中'};
+
+function render(){
+ const fs=[...new Set(orders.map(o=>o.factory))];
+ const info=orders.map(o=>({o,c:calc(o)}));
+ let min=T-5,max=T+25;
+ info.forEach(x=>{min=Math.min(min,x.c.s-2);max=Math.max(max,x.c.e+4)});
+ const n=max-min+1;
+ let mh='',dh='',wk='';
+ for(let i=0;i<n;){
+  const d=new Date((min+i)*DAY),m=d.getUTCMonth();let j=i;
+  while(j<n&&new Date((min+j)*DAY).getUTCMonth()===m)j++;
+  mh+=`<div class="m" style="width:${(j-i)*DW}px">${d.getUTCFullYear()}年${m+1}月</div>`;i=j;
+ }
+ for(let k=0;k<n;k++){
+  const d=new Date((min+k)*DAY),w=d.getUTCDay()%6===0;
+  dh+=`<div class="d${w?' we':''}${min+k===T?' td':''}" style="width:${DW}px">${d.getUTCDate()}</div>`;
+  if(w)wk+=`<i class="wk" style="left:${k*DW}px;width:${DW}px"></i>`;
+ }
+ let rows='';
+ fs.forEach(f=>{
+  const list=info.filter(x=>x.o.factory===f).sort((a,b)=>a.c.s-b.c.s),lanes=[];
+  list.forEach(x=>{let l=lanes.findIndex(e=>e<x.c.s);if(l<0){l=lanes.length;lanes.push(0)}lanes[l]=x.c.e;x.l=l});
+  const h=lanes.length*32+8;
+  const tot=list.reduce((a,x)=>a+Number(x.o.total),0),dn=list.reduce((a,x)=>a+Math.min(Number(x.o.done),Number(x.o.total)),0);
+  const bars=list.map(x=>{
+   const c=x.c,o=x.o,cls=c.behind?'warn':c.st,pct=Math.round(c.act*100);
+   const tip=`${o.name}\n${o.start} 至 ${o.end}（${c.len}天）\n已完成 ${o.done}/${o.total}（${pct}%）\n计划进度 ${Math.round(c.plan*100)}%，状态：${NAME[c.st]}${c.behind?'（落后）':''}`;
+   return `<button class="bar ${cls}" data-id="${o.id}" title="${esc(tip)}" style="left:${(c.s-min)*DW+1}px;width:${c.len*DW-2}px;top:${x.l*32+6}px"><span class="f" style="width:${pct}%"></span>${esc(o.name)} ${pct}%</button>`;
+  }).join('');
+  rows+=`<div class="row" style="height:${h}px"><div class="lab"><b>${esc(f)}</b><span>完成率 ${tot?Math.round(dn/tot*100):0}%</span></div><div class="trk" style="width:${n*DW}px">${bars}</div></div>`;
+ });
+ document.getElementById('chart').style.minWidth=(150+n*DW)+'px';
+ document.getElementById('chart').innerHTML=
+  `<div class="grid" style="width:${n*DW}px">${wk}<i class="tl" style="left:${(T-min)*DW+DW/2-1}px"></i></div>`+
+  `<div class="hd"><div class="lab"></div><div><div class="mrow">${mh}</div><div class="drow">${dh}</div></div></div>`+rows;
+
+ // stats
+ let late=0,behind=0,gT=0,gD=0,gN=0,gL=0,body='';
+ fs.forEach(f=>{
+  const list=info.filter(x=>x.o.factory===f);
+  const tot=list.reduce((a,x)=>a+Number(x.o.total),0),dn=list.reduce((a,x)=>a+Math.min(Number(x.o.done),Number(x.o.total)),0);
+  const lt=list.filter(x=>x.c.st==='late').length,bh=list.filter(x=>x.c.behind).length;
+  const days=new Set();list.forEach(x=>{for(let d=Math.max(x.c.s,T);d<=Math.min(x.c.e,T+29);d++)days.add(d)});
+  const load=Math.round(days.size/30*100),pct=tot?Math.round(dn/tot*100):0;
+  late+=lt;behind+=bh;gT+=tot;gD+=dn;gN+=list.length;gL+=days.size;
+  body+=`<tr><td>${esc(f)}</td><td>${list.length}</td><td>${tot.toLocaleString()}</td><td>${dn.toLocaleString()}</td><td>${pct}%<span class="pb"><i style="width:${pct}%"></i></span></td><td class="${lt?'bad':''}">${lt}</td><td class="${bh?'wn':''}">${bh}</td><td>${load}%</td></tr>`;
+ });
+ const fl=fs.length||1;
+ body+=`<tr><td>合计</td><td>${gN}</td><td>${gT.toLocaleString()}</td><td>${gD.toLocaleString()}</td><td>${gT?Math.round(gD/gT*100):0}%</td><td>${late}</td><td>${behind}</td><td>${Math.round(gL/30/fl*100)}%</td></tr>`;
+ document.getElementById('stats').innerHTML=`<tr><th>工厂</th><th>订单数</th><th>计划总量</th><th>已完成</th><th>完成率</th><th>延期订单</th><th>进度落后</th><th>未来30天排产负载</th></tr>`+body;
+ document.getElementById('sum').textContent=`${fs.length} 家工厂，${gN} 个排产订单，${late} 个延期，${behind} 个进度落后。点击任意排产条即可更新时间和完成数量。`;
+ document.getElementById('facs').innerHTML=fs.map(f=>`<option value="${esc(f)}">`).join('');
+ save();
+}
+
+const dlg=document.getElementById('dlg'),$=id=>document.getElementById(id);
+let cur=null,delArm=false;
+function openDlg(id){
+ cur=id;delArm=false;$('del').textContent='删除';$('err').textContent='';
+ const o=orders.find(x=>x.id===id)||{factory:orders[0]?orders[0].factory:'',name:'',start:fromN(T),end:fromN(T+7),total:1000,done:0};
+ $('dt').textContent=id?'更新排产':'新增排产';
+ $('f_fac').value=o.factory;$('f_name').value=o.name;$('f_s').value=o.start;$('f_e').value=o.end;$('f_t').value=o.total;$('f_d').value=o.done;
+ $('del').style.visibility=id?'visible':'hidden';
+ dlg.showModal();
+}
+$('add').onclick=()=>openDlg(null);
+$('cancel').onclick=()=>dlg.close();
+$('chart').addEventListener('click',e=>{const b=e.target.closest('.bar');if(b)openDlg(b.dataset.id)});
+$('del').onclick=()=>{
+ if(!delArm){delArm=true;$('del').textContent='确认删除';return}
+ orders=orders.filter(x=>x.id!==cur);dlg.close();render();
+};
+$('frm').onsubmit=e=>{
+ e.preventDefault();
+ const o={factory:$('f_fac').value.trim(),name:$('f_name').value.trim(),start:$('f_s').value,end:$('f_e').value,total:Number($('f_t').value),done:Number($('f_d').value)};
+ if(o.end<o.start){$('err').textContent='结束日期不能早于开始日期。';return}
+ if(o.done>o.total){$('err').textContent='已完成数量不能超过计划数量。';return}
+ if(cur){Object.assign(orders.find(x=>x.id===cur),o)}else{orders.push({id:'o'+Date.now(),...o})}
+ dlg.close();render();
+};
+$('reset').onclick=()=>{orders=sample();render()};
+render();
+</script>
+</body>
+</html>
